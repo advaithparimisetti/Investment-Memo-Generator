@@ -1,0 +1,12 @@
+phidata>=2.4.0
+google-generativeai
+openai
+yfinance
+duckduckgo-search
+python-dotenv
+fastapi
+uvicorn
+pydantic
+reportlab
+packaging
+requests

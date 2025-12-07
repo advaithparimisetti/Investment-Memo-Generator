@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Memo Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Extra styling for the dropdown */
+        .model-select {
+            background: #0a0f0d;
+            color: var(--neon-green);
+            border: 1px solid var(--dim-green);
+            padding: 0 15px;
+            font-family: var(--font-stack);
+            font-size: 0.9rem;
+            height: 100%;
+            outline: none;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .model-select:hover {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.1);
+        }
+        option { background: #000; color: var(--text-primary); }
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <div class="main-interface">
+        <header>
+            <div class="brand">
+                <span class="logo-glitch" data-text="INV_MEMO_GEN">INVESTMENT MEMO GENERATOR</span>
+                <span class="version">SYS.V2.1_SELECTOR</span>
+            </div>
+            <div class="status-panel">
+                <div class="status-item"><span class="led green"></span>NET: SECURE</div>
+                <div class="status-item"><span class="led green"></span>AGENTS: ACTIVE</div>
+                <div class="status-item" id="clock">00:00:00</div>
+            </div>
+        </header>
+
+        <div class="command-deck">
+            <div class="input-wrapper">
+                <span class="prompt">USER@ORACLE:~$ analyze --target</span>
+                <input type="text" id="tickerInput" placeholder="NVDA, RELIANCE.NS, 7203.T" maxlength="20" autocomplete="off" onkeypress="handleEnter(event)">
+            </div>
+            
+          <select id="modelSelect" class="model-select">
+    <optgroup label="GROQ (FASTEST)">
+        <option value="llama-3.3-70b-versatile">LLAMA 3.3 70B (GROQ)</option>
+        <option value="llama-3.1-8b-instant">LLAMA 3.1 8B (GROQ)</option>
+    </optgroup>
+</select>
+
+            <button id="execBtn" onclick="runAnalysis()">
+                <span class="btn-text">INITIALIZE SEQUENCE</span>
+                <span class="btn-glare"></span>
+            </button>
+        </div>
+
+        <div class="viewport">
+            <div id="idleState" class="terminal-screen">
+                <p>> SYSTEM READY.</p>
+                <p>> SELECT MODEL PROTOCOL TO BEGIN.</p>
+                <p>> WAITING FOR TARGET ACQUISITION...</p>
+                <p class="blink">_</p>
+            </div>
+
+            <div id="loader" class="hidden terminal-screen center-content">
+                <div class="cyber-loader"></div>
+                <div class="loading-text" id="loadingText">ESTABLISHING UPLINK...</div>
+            </div>
+
+            <div id="resultArea" class="hidden">
+                <div class="result-header">
+                    <div class="asset-tag" id="assetTag">UNKNOWN</div>
+                    <button class="download-btn" onclick="downloadPDF()">
+                        <span class="icon">💾</span> EXPORT_MEMO.PDF
+                    </button>
+                </div>
+                <div id="reportContent" class="markdown-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
