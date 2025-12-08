@@ -6,6 +6,8 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Powered By](https://img.shields.io/badge/Powered%20By-Groq_%26_Llama_3-purple)
 
+https://investment-memo-generator.onrender.com/
+
 ## 🧐 The Vision
 Wall Street hedge funds have armies of analysts, Bloomberg terminals, and proprietary data. The average retail investor has... gut feelings and Reddit.
 
