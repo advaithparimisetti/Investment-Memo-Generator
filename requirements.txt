@@ -1,7 +1,7 @@
 phidata>=2.4.0
 google-generativeai
 openai
-yfinance>=0.2.40
+yfinance
 duckduckgo-search
 python-dotenv
 fastapi
@@ -10,6 +10,3 @@ pydantic
 reportlab
 packaging
 requests
-slowapi
-requests-cache
-requests-ratelimiter
