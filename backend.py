@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, Request, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,20 +13,8 @@ from dotenv import load_dotenv
 import os
 import io
 import re
-import uuid
 import warnings
 import logging
-import yfinance as yf
-
-# --- RATE LIMIT & SESSION FIXES ---
-from requests import Session
-from requests_cache import CachedSession
-from requests_ratelimiter import LimiterSession
-
-# Rate Limiting (FastAPI)
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
 # ReportLab Imports
 from reportlab.lib.pagesizes import LETTER
@@ -40,44 +28,14 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.getLogger("duckduckgo_search").setLevel(logging.ERROR)
 load_dotenv()
 
-# --- FIX: YAHOO FINANCE SESSION OVERRIDE ---
-# This forces yfinance to use a cached session with a browser User-Agent
-# to avoid 429 Rate Limit errors.
-def configure_yfinance():
-    session = CachedSession('yfinance.cache', expire_after=300) # Cache for 5 mins
-    session.headers['User-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-    # Apply this session to the yfinance library globally
-    # Note: Phidata's YFinanceTools uses yfinance internally, 
-    # but strictly speaking it doesn't always accept a session injection easily.
-    # However, setting header on the global request level often helps.
-    pass 
-
-configure_yfinance()
-# -------------------------------------------
-
-# Initialize Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# SECURITY: Restrict CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], 
-    allow_methods=["GET", "POST"],
+    allow_origins=["*"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# SECURITY: Simple Server-Side Cache
-REPORT_CACHE = {}
-API_KEY = os.getenv("APP_API_KEY", "demo-secret-key")
-
-async def verify_api_key(x_api_key: str = Header(None)):
-    # Optional: For dev convenience, if no key is sent, we might warn or block.
-    # For now, matching the frontend 'demo-secret-key'
-    if x_api_key and x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
 
 # --- 1. SEARCH TOOL ---
 class RobustSearchTool(Toolkit):
@@ -101,6 +59,7 @@ class PDFGenerator:
         self.story = []
         self.styles.add(ParagraphStyle(name='MemoTitle', parent=self.styles['Title'], fontSize=24, spaceAfter=20, alignment=TA_CENTER, textColor=colors.darkblue))
         self.styles.add(ParagraphStyle(name='SectionHeader', parent=self.styles['Heading2'], fontSize=14, spaceBefore=15, spaceAfter=10, textColor=colors.black))
+        self.styles.add(ParagraphStyle(name='TableCell', parent=self.styles['Normal'], fontSize=9, leading=11))
 
     def add_header(self, ticker):
         self.story.append(Paragraph(f"Investment Memo: {ticker}", self.styles['MemoTitle']))
@@ -124,8 +83,11 @@ class PDFGenerator:
         doc = SimpleDocTemplate(self.buffer, pagesize=LETTER)
         doc.build(self.story)
 
-# --- 3. AGENT FACTORY ---
+# --- 3. AGENT FACTORY (STRICT FORMATTING) ---
 def get_agent(model_id: str):
+    print(f"🤖 Initializing Agent with Model: {model_id}")
+    print("⚡ Using Groq Acceleration (Llama 3)...")
+    
     model_instance = OpenAIChat(
         id=model_id,
         api_key=os.getenv("GROQ_API_KEY"),
@@ -135,17 +97,50 @@ def get_agent(model_id: str):
     return Agent(
         name="Analyst Advaith",
         model=model_instance,
-        # WE ADD DuckDuckGo FIRST so it can find news if yfinance fails
-        tools=[
-            YFinanceTools(stock_price=True, analyst_recommendations=True, stock_fundamentals=True, company_news=True), 
-            RobustSearchTool()
-        ],
+        tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, stock_fundamentals=True, company_news=True), RobustSearchTool()],
         instructions=[
-            "You are a Senior Wall Street Equity Research Analyst.",
-            "Write a confidential, high-stakes Investment Memo.",
-            "NO CHITCHAT. STRICT MARKDOWN FORMAT.",
-            "Use tables for financials.",
-            "If YFinance fails or returns 'Rate Limit', use the 'web_search' tool to find the CURRENT PRICE and P/E ratio manually."
+           "You are a Senior Wall Street Equity Research Analyst.",
+            "You are writing a confidential, high-stakes Investment Memo.",
+            "",
+            "### CRITICAL INSTRUCTIONS:",
+            "1. **NO CHITCHAT:** Do not start with 'Here is the report' or 'I have analyzed...'. Start directly with the first header.",
+            "2. **USE TOOLS:** You MUST use the 'YFinanceTools' or 'web_search' to find the CURRENT stock price, P/E ratio, and recent news. Do not hallucinate numbers.",
+            "3. **STRICT FORMAT:** Follow the markdown structure below EXACTLY.",
+            "",
+            "### REPORT FORMAT:",
+            "## 1. Executive Summary",
+            "- **Recommendation:** [BUY / SELL / HOLD]",
+            "- **Current Price:** [Insert Real Price] | **Target Price:** [Insert Prediction]",
+            "- **Thesis:** [Professional summary of why this trade makes sense]",
+            "",
+            "## 2. Company Overview",
+            "[Concise description of the business model and primary revenue streams]",
+            "",
+            "## 3. Financial Analysis",
+            "| Metric | Value | Comment |",
+            "| :--- | :--- | :--- |",
+            "| **Revenue Growth** | [Value] | [YoY trend] |",
+            "| **Profit Margin** | [Value] | [Efficiency check] |",
+            "| **P/E Ratio** | [Value] | [vs Industry Avg] |",
+            "*(Narrative analysis of the company's financial health)*",
+            "",
+            "## 4. Key Catalysts",
+            "- [Specific upcoming event/product launch]",
+            "- [Macro factor helping the company]",
+            "",
+            "## 5. Investment Risks",
+            "- [Risk 1]",
+            "- [Risk 2]",
+            "",
+            "## 6. Conclusion",
+            "[Final verdict: Position size suggestion and time horizon]",
+            "",
+            "### DATA RULES:",
+            "- If the ticker is OTC (e.g. MAHMF), assume USD currency.",
+            "- If the user implies a foreign market (e.g. Reliance), use the local ticker (RELIANCE.NS) to get INR prices."
+            "### CRUCIAL RULES:",
+            "1. **CURRENCY CHECK**: If the ticker is OTC (e.g., MAHMF), the price is USD. If the user wants local (e.g., INR), find the domestic ticker (e.g., M_M.NS).",
+            "2. **NO HALLUCINATIONS**: If financial data is missing, explicitly state 'Data Unavailable'."
         ],
         show_tool_calls=False,
         markdown=True,
@@ -158,49 +153,28 @@ class RequestModel(BaseModel):
 
 class PDFRequestModel(BaseModel):
     ticker: str
-    report_id: str
+    content: str
 
-@app.post("/api/analyze", dependencies=[Depends(verify_api_key)])
-@limiter.limit("5/minute") 
-async def analyze(request: Request, body: RequestModel):
+@app.post("/api/analyze")
+async def analyze(request: RequestModel):
     try:
-        # Input Validation
-        if not body.ticker.isalnum() and "." not in body.ticker: 
-            raise HTTPException(status_code=400, detail="Invalid Ticker Symbol")
-
-        print(f"🚀 Analyzing: {body.ticker} using {body.model}")
-        agent = get_agent(body.model)
-        prompt = (f"Write a professional Investment Memo for '{body.ticker}'. "
-                  f"Follow the STRICT format instructions. "
-                  f"If you cannot get data from yfinance, search for it on DuckDuckGo.")
-        
+        print(f"🚀 Analyzing: {request.ticker} using {request.model}")
+        agent = get_agent(request.model)
+        prompt = (f"Write a professional Investment Memo for '{request.ticker}'. "
+                  f"Follow the STRICT format in your instructions.")
         response = agent.run(prompt, stream=False)
-        content = response.content
-        
-        # Cache Result
-        report_id = str(uuid.uuid4())
-        REPORT_CACHE[report_id] = content
-        
-        if len(REPORT_CACHE) > 100:
-            REPORT_CACHE.clear()
-
-        return {"markdown": content, "report_id": report_id}
+        return {"markdown": response.content}
     except Exception as e:
         print(f"❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/pdf", dependencies=[Depends(verify_api_key)])
-@limiter.limit("10/minute")
-async def get_pdf(request: Request, body: PDFRequestModel):
+@app.post("/api/pdf")
+async def get_pdf(request: PDFRequestModel):
     try:
-        content = REPORT_CACHE.get(body.report_id)
-        if not content:
-            raise HTTPException(status_code=404, detail="Report expired or not found.")
-
         buffer = io.BytesIO()
         pdf = PDFGenerator(buffer)
-        pdf.add_header(body.ticker)
-        pdf.build_report(content)
+        pdf.add_header(request.ticker)
+        pdf.build_report(request.content)
         pdf.generate()
         return Response(content=buffer.getvalue(), media_type="application/pdf")
     except Exception as e:
