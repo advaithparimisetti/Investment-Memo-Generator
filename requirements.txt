@@ -10,3 +10,4 @@ pydantic
 reportlab
 packaging
 requests
+slowapi
