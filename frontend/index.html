@@ -5,13 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Investment Memo Generator</title>
     <link rel="stylesheet" href="style.css">
-    
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script> 
-    
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Extra styling for the dropdown */
         .model-select {
             background: #0a0f0d;
             color: var(--neon-green);
@@ -40,7 +37,7 @@
         <header>
             <div class="brand">
                 <span class="logo-glitch" data-text="INV_MEMO_GEN">INVESTMENT MEMO GENERATOR</span>
-                <span class="version">SYS.V2.2_SECURE</span>
+                <span class="version">SYS.V2.1_SELECTOR</span>
             </div>
             <div class="status-panel">
                 <div class="status-item"><span class="led green"></span>NET: SECURE</div>
@@ -56,11 +53,11 @@
             </div>
             
           <select id="modelSelect" class="model-select">
-            <optgroup label="GROQ (FASTEST)">
-                <option value="llama-3.3-70b-versatile">LLAMA 3.3 70B (GROQ)</option>
-                <option value="llama-3.1-8b-instant">LLAMA 3.1 8B (GROQ)</option>
-            </optgroup>
-          </select>
+    <optgroup label="GROQ (FASTEST)">
+        <option value="llama-3.3-70b-versatile">LLAMA 3.3 70B (GROQ)</option>
+        <option value="llama-3.1-8b-instant">LLAMA 3.1 8B (GROQ)</option>
+    </optgroup>
+</select>
 
             <button id="execBtn" onclick="runAnalysis()">
                 <span class="btn-text">INITIALIZE SEQUENCE</span>
