@@ -1,6 +1,5 @@
 let currentMarkdown = "";
 let currentTicker = "";
-let currentReportId = ""; // NEW: For secure PDF retrieval
 
 // Initialize Clock
 setInterval(() => {
@@ -14,20 +13,16 @@ function handleEnter(e) {
 
 async function runAnalysis() {
     const input = document.getElementById('tickerInput');
-    const modelSelect = document.getElementById('modelSelect');
+    const modelSelect = document.getElementById('modelSelect'); // NEW
     const btn = document.getElementById('execBtn');
     const ticker = input.value.trim().toUpperCase();
-    const model = modelSelect.value;
+    const model = modelSelect.value; // NEW
 
-    // Sanitize Input (Basic client-side check)
-    if (!ticker || !/^[A-Z0-9\.\-_]+$/.test(ticker)) {
-        alert("INVALID TICKER FORMAT");
-        return;
-    }
+    if (!ticker) return;
 
     // LOCK UI
     input.disabled = true;
-    modelSelect.disabled = true;
+    modelSelect.disabled = true; // NEW
     btn.disabled = true;
     btn.innerHTML = "PROCESSING <span class='blink'>...</span>";
     
@@ -47,32 +42,21 @@ async function runAnalysis() {
 
     try {
         currentTicker = ticker;
-        
-        // 1. ADD API KEY HEADER (Ideally this comes from a secure env or login)
-        // For this demo, we assume the backend allows a public 'demo-key' or similar
+        // SEND MODEL IN REQUEST
         const response = await fetch('/api/analyze', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'x-api-key': 'demo-secret-key' // Example key
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ticker: ticker, model: model })
         });
 
-        if (response.status === 429) throw new Error("Rate Limit Exceeded. Try again later.");
-        if (!response.ok) throw new Error("Connection Refused / Error");
+        if (!response.ok) throw new Error("Connection Refused / Quota Exceeded");
 
         const data = await response.json();
         currentMarkdown = data.markdown;
-        currentReportId = data.report_id; // Capture ID for PDF
 
         // RENDER
         document.getElementById('assetTag').innerText = `// ${ticker}`;
-        
-        // SECURITY FIX: Sanitize HTML before insertion
-        const rawHtml = marked.parse(currentMarkdown);
-        const cleanHtml = DOMPurify.sanitize(rawHtml);
-        document.getElementById('reportContent').innerHTML = cleanHtml;
+        document.getElementById('reportContent').innerHTML = marked.parse(currentMarkdown);
         
         clearInterval(logInterval);
         document.getElementById('loader').classList.add('hidden');
@@ -86,7 +70,7 @@ async function runAnalysis() {
     } finally {
         // UNLOCK UI
         input.disabled = false;
-        modelSelect.disabled = false;
+        modelSelect.disabled = false; // NEW
         input.value = "";
         input.focus();
         btn.disabled = false;
@@ -95,25 +79,17 @@ async function runAnalysis() {
 }
 
 async function downloadPDF() {
-    if (!currentReportId) return;
-
     const btn = document.querySelector('.download-btn');
     const originalText = btn.innerHTML;
     btn.innerHTML = "DL_IN_PROGRESS...";
     btn.disabled = true;
 
     try {
-        // SECURITY FIX: Request PDF by ID, not by sending content back
         const response = await fetch('/api/pdf', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'x-api-key': 'demo-secret-key'
-            },
-            body: JSON.stringify({ ticker: currentTicker, report_id: currentReportId })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker: currentTicker, content: currentMarkdown })
         });
-
-        if (!response.ok) throw new Error("PDF Generation Failed");
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -124,7 +100,7 @@ async function downloadPDF() {
         a.click();
         a.remove();
     } catch (e) {
-        alert("DOWNLOAD FAILED: " + e.message);
+        alert("DOWNLOAD FAILED");
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
